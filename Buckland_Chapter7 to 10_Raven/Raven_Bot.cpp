@@ -22,6 +22,8 @@
 
 #include "Debug/DebugConsole.h"
 
+#include <limits>
+
 //-------------------------- ctor ---------------------------------------------
 Raven_Bot::Raven_Bot(Raven_Game* world,Vector2D pos):
 
@@ -576,4 +578,94 @@ void Raven_Bot::IncreaseHealth(unsigned int val)
 {
   m_iHealth+=val; 
   Clamp(m_iHealth, 0, m_iMaxHealth);
+}
+
+
+//-------------------------- IsInCrossfireSituation ---------------------------
+//
+//  Returns true if the bot is positioned between two other bots in a way
+//  that makes it vulnerable (crossfire situation).
+//-----------------------------------------------------------------------------
+bool Raven_Bot::IsInCrossfireSituation()
+{
+    if (GetTargetSys()->GetTarget() == nullptr) return false;
+
+    // Find the two closest bots
+    Raven_Bot* bot1 = nullptr;
+    Raven_Bot* bot2 = nullptr;
+    //double minDistance1 = std::numeric_limits<double>::max();
+    //double minDistance2 = std::numeric_limits<double>::max();
+    double minDistance1 = 1e308;
+    double minDistance2 = 1e308;
+
+    for (const auto& bot : GetWorld()->GetAllBots())
+    {
+        if (bot == this || bot->isDead()) continue;
+
+        double distance = Vec2DDistanceSq(Pos(), bot->Pos());
+
+        if (distance < minDistance1)
+        {
+            bot2 = bot1;
+            minDistance2 = minDistance1;
+            bot1 = bot;
+            minDistance1 = distance;
+        }
+        else if (distance < minDistance2)
+        {
+            bot2 = bot;
+            minDistance2 = distance;
+        }
+    }
+
+    if (bot1 == nullptr || bot2 == nullptr) return false;
+
+    // Check if the bot is between the two closest enemies
+    Vector2D midpoint = (bot1->Pos() + bot2->Pos()) / 2.0;
+    double midpointDistance = Vec2DDistanceSq(Pos(), midpoint);
+
+    return midpointDistance < minDistance1 && midpointDistance < minDistance2;
+}
+
+//-------------------------- CalculateSafePosition ----------------------------
+//
+//  Calculates a safe position for the bot to avoid crossfire, considering
+//  nearby walls and enemies.
+//-----------------------------------------------------------------------------
+Vector2D Raven_Bot::CalculateSafePosition()
+{
+    Raven_Map* map = GetWorld()->GetMap();
+    const auto& walls = map->GetWalls();
+
+    Vector2D bestPosition = Pos();
+    double maxDistance = 0;
+
+    for (const auto& wall : walls)
+    {
+        // Consider a position near each wall as a potential safe position
+        Vector2D potentialPosition = wall->From() + (wall->To() - wall->From()) * 0.5;
+
+        double distance = Vec2DDistanceSq(Pos(), potentialPosition);
+
+        if (distance > maxDistance && !GetWorld()->isLOSOkay(Pos(), potentialPosition))
+        {
+            maxDistance = distance;
+            bestPosition = potentialPosition;
+        }
+    }
+
+    // Add an additional factor to move away from enemies
+    Vector2D awayFromEnemies(0, 0);
+    for (const auto& bot : GetWorld()->GetAllBots())
+    {
+        if (bot != this && !bot->isDead())
+        {
+            awayFromEnemies += (Pos() - bot->Pos());
+        }
+    }
+
+    awayFromEnemies.Normalize();
+    awayFromEnemies *= 50; // Move 50 units away from enemies
+
+    return bestPosition + awayFromEnemies;
 }

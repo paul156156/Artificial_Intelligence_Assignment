@@ -11,12 +11,14 @@
 #include "Goal_Wander.h"
 #include "Raven_Goal_Types.h"
 #include "Goal_AttackTarget.h"
+#include "Goal_AvoidCrossfire.h"
 
 
 #include "GetWeaponGoal_Evaluator.h"
 #include "GetHealthGoal_Evaluator.h"
 #include "ExploreGoal_Evaluator.h"
 #include "AttackTargetGoal_Evaluator.h"
+#include "AvoidCrossfireGoal_Evaluator.h"
 
 
 Goal_Think::Goal_Think(Raven_Bot* pBot):Goal_Composite<Raven_Bot>(pBot, goal_think)
@@ -33,6 +35,7 @@ Goal_Think::Goal_Think(Raven_Bot* pBot):Goal_Composite<Raven_Bot>(pBot, goal_thi
   double RailgunBias = RandInRange(LowRangeOfBias, HighRangeOfBias);
   double ExploreBias = RandInRange(LowRangeOfBias, HighRangeOfBias);
   double AttackBias = RandInRange(LowRangeOfBias, HighRangeOfBias);
+  double SafetyBias = RandInRange(LowRangeOfBias, HighRangeOfBias);
 
   //create the evaluator objects
   m_Evaluators.push_back(new GetHealthGoal_Evaluator(HealthBias));
@@ -44,6 +47,9 @@ Goal_Think::Goal_Think(Raven_Bot* pBot):Goal_Composite<Raven_Bot>(pBot, goal_thi
                                                      type_rail_gun));
   m_Evaluators.push_back(new GetWeaponGoal_Evaluator(RocketLauncherBias,
                                                      type_rocket_launcher));
+
+  m_Evaluators.push_back(new AvoidCrossfireGoal_Evaluator(SafetyBias));
+
 }
 
 //----------------------------- dtor ------------------------------------------
@@ -165,6 +171,13 @@ void Goal_Think::AddGoal_AttackTarget()
     AddSubgoal( new Goal_AttackTarget(m_pOwner));
   }
 }
+
+void Goal_Think::AddGoal_AvoidCrossfire(const Vector2D& safePos)
+{
+    RemoveAllSubgoals();
+    AddSubgoal(new Goal_AvoidCrossfire(m_pOwner, safePos));
+}
+
 
 //-------------------------- Queue Goals --------------------------------------
 //-----------------------------------------------------------------------------
