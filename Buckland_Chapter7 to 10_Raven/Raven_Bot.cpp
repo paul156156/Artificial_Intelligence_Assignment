@@ -1,3 +1,4 @@
+// 2017180011 박정환
 #include "Raven_Bot.h"
 #include "misc/Cgdi.h"
 #include "misc/utils.h"
@@ -579,20 +580,12 @@ void Raven_Bot::IncreaseHealth(unsigned int val)
 }
 
 
-//-------------------------- IsInCrossfireSituation ---------------------------
-//
-//  Returns true if the bot is positioned between two other bots in a way
-//  that makes it vulnerable (crossfire situation).
-//-----------------------------------------------------------------------------
 bool Raven_Bot::IsInCrossfireSituation()
 {
     if (GetTargetSys()->GetTarget() == nullptr) return false;
 
-    // Find the two closest bots
     Raven_Bot* bot1 = nullptr;
     Raven_Bot* bot2 = nullptr;
-    //double minDistance1 = std::numeric_limits<double>::max();
-    //double minDistance2 = std::numeric_limits<double>::max();
     double minDistance1 = 1e308;
     double minDistance2 = 1e308;
 
@@ -618,63 +611,127 @@ bool Raven_Bot::IsInCrossfireSituation()
 
     if (bot1 == nullptr || bot2 == nullptr) return false;
 
-    // Check if the bot is between the two closest enemies
+    Vector2D A = bot1->Pos();
+    Vector2D B = bot2->Pos();
+    Vector2D P = Pos();
+
+    Vector2D AB = B - A;
+    Vector2D AP = P - A;
+
+    double dotProduct1 = AB.Dot(AP);
+    double dotProduct2 = AB.Dot(AB);
+
+    if (dotProduct1 < 0 || dotProduct1 > dotProduct2) return false;
+
+    double distanceToSegment = abs((AB.x * AP.y - AB.y * AP.x) / AB.Length());
+
+    const double threshold = 10.0;
+
+    return distanceToSegment <= threshold;
+}
+
+double Raven_Bot::GetCrossfireDangerLevel()
+{
+    Raven_Bot* bot1 = nullptr;
+    Raven_Bot* bot2 = nullptr;
+    double minDistance1 = 1e308;
+    double minDistance2 = 1e308;
+
+    for (const auto& bot : GetWorld()->GetAllBots())
+    {
+        if (bot == this || bot->isDead()) continue;
+
+        double distance = Vec2DDistanceSq(Pos(), bot->Pos());
+
+        if (distance < minDistance1)
+        {
+            bot2 = bot1;
+            minDistance2 = minDistance1;
+            bot1 = bot;
+            minDistance1 = distance;
+        }
+        else if (distance < minDistance2)
+        {
+            bot2 = bot;
+            minDistance2 = distance;
+        }
+    }
+
+    if (bot1 == nullptr || bot2 == nullptr)
+    {
+        return 0.0;
+    }
+
+    double distanceBetweenBots = Vec2DDistance(bot1->Pos(), bot2->Pos());
+
     Vector2D midpoint = (bot1->Pos() + bot2->Pos()) / 2.0;
-    double midpointDistance = Vec2DDistanceSq(Pos(), midpoint);
+    double distanceToMidpoint = Vec2DDistance(Pos(), midpoint);
 
-    // 교차 화력 상태를 벗어나도록 조건 추가
-    //if (midpointDistance > 100.0) // 안전 거리 예시 (100.0)
-    //{
-    //    return false;
-    //}
+    double proximityScore = 1.0 - (distanceToMidpoint / (distanceBetweenBots / 2.0));
 
-    return midpointDistance < minDistance1 && midpointDistance < minDistance2;
+    Clamp(proximityScore, 0.0, 1.0);
+
+    return proximityScore;
 }
 
 Vector2D Raven_Bot::CalculateSafePosition()
 {
-    Raven_Map* map = GetWorld()->GetMap();
-    const auto& walls = map->GetWalls();
+    Raven_Bot* bot1 = nullptr;
+    Raven_Bot* bot2 = nullptr;
+    double minDistance1 = 1e308;
+    double minDistance2 = 1e308;
 
-    Vector2D bestPosition = Pos();
-    double maxDistance = 0;
-
-    for (const auto& wall : walls)
-    {
-        Vector2D wallDirection = Vec2DNormalize(wall->To() - wall->From());
-        Vector2D perpendicular = Vector2D(-wallDirection.y, wallDirection.x);
-        Vector2D potentialPosition = wall->From() + (wall->To() - wall->From()) * 0.5 + perpendicular * 20.0;
-
-        double distance = Vec2DDistanceSq(Pos(), potentialPosition);
-
-        if (distance > maxDistance && map->IsValidPosition(potentialPosition))
-        {
-            maxDistance = distance;
-            bestPosition = potentialPosition;
-        }
-    }
-
-    Vector2D awayFromEnemies(0, 0);
     for (const auto& bot : GetWorld()->GetAllBots())
     {
-        if (bot != this && !bot->isDead())
+        if (bot == this || bot->isDead()) continue;
+
+        double distance = Vec2DDistanceSq(Pos(), bot->Pos());
+        if (distance < minDistance1)
         {
-            awayFromEnemies += (Pos() - bot->Pos());
+            bot2 = bot1;
+            minDistance2 = minDistance1;
+            bot1 = bot;
+            minDistance1 = distance;
+        }
+        else if (distance < minDistance2)
+        {
+            bot2 = bot;
+            minDistance2 = distance;
         }
     }
 
-    if (awayFromEnemies.LengthSq() > 0)
+    if (bot1 == nullptr || bot2 == nullptr)
     {
-        awayFromEnemies.Normalize();
-        awayFromEnemies *= 50;
+        return Pos();
     }
 
-    Vector2D finalPosition = bestPosition + awayFromEnemies;
+    Vector2D A = bot1->Pos();
+    Vector2D B = bot2->Pos();
+    Vector2D AB = Vec2DNormalize(B - A);
 
-    if (!map->IsValidPosition(finalPosition))
+    Vector2D AP = Pos() - A;
+    double projectionLength = AP.Dot(AB);
+
+    Vector2D closestPoint = A + AB * projectionLength;
+
+    Vector2D perpendicular(-AB.y, AB.x);
+    const double escapeDistance = 10.0;
+
+    Vector2D potentialPosition1 = closestPoint + perpendicular * escapeDistance;
+    Vector2D potentialPosition2 = closestPoint - perpendicular * escapeDistance;
+
+    Raven_Map* map = GetWorld()->GetMap();
+
+    if (map->IsValidPosition(potentialPosition1) &&
+        Vec2DDistanceSq(Pos(), potentialPosition1) >
+        Vec2DDistanceSq(Pos(), potentialPosition2))
     {
-        finalPosition = map->GetNearestValidPosition(finalPosition);
+        return potentialPosition1;
+    }
+    else if (map->IsValidPosition(potentialPosition2))
+    {
+        return potentialPosition2;
     }
 
-    return finalPosition;
+    return Pos();
 }
