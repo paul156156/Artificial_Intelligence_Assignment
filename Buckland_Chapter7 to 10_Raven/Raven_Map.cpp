@@ -14,7 +14,6 @@
 
 #include "Raven_UserOptions.h"
 
-
 //uncomment to write object creation/deletion to debug console
 #define  LOG_CREATIONAL_STUFF
 #include "debug/DebugConsole.h"
@@ -410,4 +409,52 @@ void Raven_Map::Render()
     gdi->GreyPen();
     gdi->Circle(*curSp, 7);
   }
+}
+
+bool Raven_Map::IsValidPosition(const Vector2D& position) const
+{
+    // 1. 맵의 경계 확인
+    if (position.x < 0 || position.x > m_iSizeX || position.y < 0 || position.y > m_iSizeY)
+    {
+        return false;
+    }
+
+    // 2. 벽과의 충돌 확인
+    for (const auto& wall : m_Walls)
+    {
+        // Check if position is too close to the wall
+        if (DistToLineSegmentSq(wall->From(), wall->To(), position) < 20.0) // 최소 거리 20 유닛
+        {
+            return false;
+        }
+    }
+
+    // 유효한 위치임
+    return true;
+}
+
+Vector2D Raven_Map::GetNearestValidPosition(const Vector2D& position) const
+{
+    // 5유닛씩 증분하며 검사
+    const double Increment = 5.0;
+    const int MaxAttempts = 20; // 최대 20단계 탐색
+
+    for (int i = 1; i <= MaxAttempts; ++i)
+    {
+        for (double dx = -i * Increment; dx <= i * Increment; dx += Increment)
+        {
+            for (double dy = -i * Increment; dy <= i * Increment; dy += Increment)
+            {
+                Vector2D testPos = position + Vector2D(dx, dy);
+
+                if (IsValidPosition(testPos))
+                {
+                    return testPos;
+                }
+            }
+        }
+    }
+
+    // 유효한 위치를 찾지 못하면 원래 위치 반환
+    return position;
 }

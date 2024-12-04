@@ -174,8 +174,15 @@ void Goal_Think::AddGoal_AttackTarget()
 
 void Goal_Think::AddGoal_AvoidCrossfire(const Vector2D& safePos)
 {
-    RemoveAllSubgoals();
-    AddSubgoal(new Goal_AvoidCrossfire(m_pOwner, safePos));
+    // 특정 봇 ID에만 목표를 추가
+    if (m_pOwner->ID() == 401) // 봇 ID가 401인 경우에만 실행
+    {
+        if (notPresent(goal_avoid_crossfire))
+        {
+            RemoveAllSubgoals(); // 기존 목표 제거
+            AddSubgoal(new Goal_AvoidCrossfire(m_pOwner, safePos));
+        }
+    }
 }
 
 

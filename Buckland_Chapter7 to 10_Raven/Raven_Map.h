@@ -123,6 +123,12 @@ public:
   int                                GetMaxDimension()const{return Maximum(m_iSizeX, m_iSizeY);}
   double                             GetCellSpaceNeighborhoodRange()const{return m_dCellSpaceNeighborhoodRange;}
 
+
+  // 위치가 유효한지 확인
+  bool IsValidPosition(const Vector2D& position) const;
+
+  // 가장 가까운 유효 위치를 반환
+  Vector2D GetNearestValidPosition(const Vector2D& position) const;
 };
 
 

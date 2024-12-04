@@ -9,8 +9,20 @@ void Goal_AvoidCrossfire::Activate()
     // Remove any existing subgoals
     RemoveAllSubgoals();
 
-    // Add a subgoal to move to the calculated safe position
-    AddSubgoal(new Goal_MoveToPosition(m_pOwner, m_vSafePosition));
+    // Check if the bot is in a crossfire situation
+    if (m_pOwner->IsInCrossfireSituation())
+    {
+        // Calculate a safe position to avoid crossfire
+        m_vSafePosition = m_pOwner->CalculateSafePosition();
+
+        // Add a subgoal to move to the safe position
+        AddSubgoal(new Goal_MoveToPosition(m_pOwner, m_vSafePosition));
+    }
+    else
+    {
+        // If not in crossfire, mark the goal as completed
+        m_iStatus = completed;
+    }
 }
 
 int Goal_AvoidCrossfire::Process()

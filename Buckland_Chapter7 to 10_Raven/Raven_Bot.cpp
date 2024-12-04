@@ -22,8 +22,6 @@
 
 #include "Debug/DebugConsole.h"
 
-#include <limits>
-
 //-------------------------- ctor ---------------------------------------------
 Raven_Bot::Raven_Bot(Raven_Game* world,Vector2D pos):
 
@@ -624,14 +622,15 @@ bool Raven_Bot::IsInCrossfireSituation()
     Vector2D midpoint = (bot1->Pos() + bot2->Pos()) / 2.0;
     double midpointDistance = Vec2DDistanceSq(Pos(), midpoint);
 
+    // 교차 화력 상태를 벗어나도록 조건 추가
+    //if (midpointDistance > 100.0) // 안전 거리 예시 (100.0)
+    //{
+    //    return false;
+    //}
+
     return midpointDistance < minDistance1 && midpointDistance < minDistance2;
 }
 
-//-------------------------- CalculateSafePosition ----------------------------
-//
-//  Calculates a safe position for the bot to avoid crossfire, considering
-//  nearby walls and enemies.
-//-----------------------------------------------------------------------------
 Vector2D Raven_Bot::CalculateSafePosition()
 {
     Raven_Map* map = GetWorld()->GetMap();
@@ -642,19 +641,19 @@ Vector2D Raven_Bot::CalculateSafePosition()
 
     for (const auto& wall : walls)
     {
-        // Consider a position near each wall as a potential safe position
-        Vector2D potentialPosition = wall->From() + (wall->To() - wall->From()) * 0.5;
+        Vector2D wallDirection = Vec2DNormalize(wall->To() - wall->From());
+        Vector2D perpendicular = Vector2D(-wallDirection.y, wallDirection.x);
+        Vector2D potentialPosition = wall->From() + (wall->To() - wall->From()) * 0.5 + perpendicular * 20.0;
 
         double distance = Vec2DDistanceSq(Pos(), potentialPosition);
 
-        if (distance > maxDistance && !GetWorld()->isLOSOkay(Pos(), potentialPosition))
+        if (distance > maxDistance && map->IsValidPosition(potentialPosition))
         {
             maxDistance = distance;
             bestPosition = potentialPosition;
         }
     }
 
-    // Add an additional factor to move away from enemies
     Vector2D awayFromEnemies(0, 0);
     for (const auto& bot : GetWorld()->GetAllBots())
     {
@@ -664,8 +663,18 @@ Vector2D Raven_Bot::CalculateSafePosition()
         }
     }
 
-    awayFromEnemies.Normalize();
-    awayFromEnemies *= 50; // Move 50 units away from enemies
+    if (awayFromEnemies.LengthSq() > 0)
+    {
+        awayFromEnemies.Normalize();
+        awayFromEnemies *= 50;
+    }
 
-    return bestPosition + awayFromEnemies;
+    Vector2D finalPosition = bestPosition + awayFromEnemies;
+
+    if (!map->IsValidPosition(finalPosition))
+    {
+        finalPosition = map->GetNearestValidPosition(finalPosition);
+    }
+
+    return finalPosition;
 }
