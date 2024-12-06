@@ -10,7 +10,7 @@ double AvoidCrossfireGoal_Evaluator::CalculateDesirability(Raven_Bot* pBot)
     double Desirability = 0.0;
     if (pBot->IsInCrossfireSituation())
     {
-        double dangerLevel = pBot->GetCrossfireDangerLevel(); // 추가 메서드
+        double dangerLevel = pBot->GetCrossfireDangerLevel();
         const double Tweaker = 2.0;
 
         Desirability = Tweaker * m_dCharacterBias * dangerLevel;
