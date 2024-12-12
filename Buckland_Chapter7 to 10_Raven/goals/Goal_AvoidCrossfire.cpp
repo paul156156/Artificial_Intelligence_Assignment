@@ -25,10 +25,8 @@ int Goal_AvoidCrossfire::Process()
 {
     ActivateIfInactive();
 
-    // Process the subgoals
     m_iStatus = ProcessSubgoals();
 
-    // If the bot reaches the safe position, mark the goal as completed
     if (m_pOwner->isAtPosition(m_vSafePosition))
     {
         m_iStatus = completed;
