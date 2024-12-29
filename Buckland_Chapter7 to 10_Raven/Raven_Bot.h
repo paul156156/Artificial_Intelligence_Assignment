@@ -211,12 +211,10 @@ public:
   Raven_SensoryMemory* const         GetSensoryMem()const{return m_pSensoryMem;}
 
 
-  // Check if the bot is in a dangerous crossfire situation
   bool IsInCrossfireSituation();
 
   double GetCrossfireDangerLevel();
 
-  // Calculate a safe position to avoid crossfire
   Vector2D CalculateSafePosition();
 
 };
